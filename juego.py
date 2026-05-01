@@ -253,6 +253,40 @@ def draw_shadow(surf, x, y, radius):
     surf.blit(s, (x - radius * 1.2, y - radius * 0.45))
 
 
+def shade(color, amount):
+    return tuple(clamp(int(c + amount), 0, 255) for c in color)
+
+
+def mix_color(a, b, t):
+    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def draw_gloss_ellipse(surf, color, rect, outline=(20, 20, 20), border=1):
+    rect = pygame.Rect(rect)
+    pygame.draw.ellipse(surf, shade(color, -28), rect)
+    inner = pygame.Rect(rect)
+    inner.inflate_ip(-max(2, rect.w // 8), -max(2, rect.h // 8))
+    pygame.draw.ellipse(surf, color, inner)
+    shine = pygame.Rect(rect.x + rect.w * 0.18, rect.y + rect.h * 0.12, rect.w * 0.38, rect.h * 0.2)
+    pygame.draw.ellipse(surf, shade(color, 55), shine)
+    pygame.draw.ellipse(surf, outline, rect, border)
+
+
+def draw_iso_block(surf, x, y, w, h, depth, top_color, side_color, outline=(30, 25, 20)):
+    left = x - w // 2
+    right = x + w // 2
+    top = y - h
+    front = [(left, top + depth), (right, top + depth), (right, y), (left, y)]
+    top_poly = [(left, top + depth), (x, top), (right, top + depth), (x, top + depth * 2)]
+    side_poly = [(right, top + depth), (x, top + depth * 2), (x, y + depth), (right, y)]
+    pygame.draw.polygon(surf, shade(side_color, -25), side_poly)
+    pygame.draw.polygon(surf, side_color, front)
+    pygame.draw.polygon(surf, top_color, top_poly)
+    pygame.draw.polygon(surf, outline, front, 1)
+    pygame.draw.polygon(surf, outline, top_poly, 1)
+    pygame.draw.line(surf, shade(top_color, 40), (left + 3, top + depth + 1), (x, top + 2), 1)
+
+
 class SoundManager:
     def __init__(self):
         self.sounds = {}
@@ -468,6 +502,8 @@ class Enemy:
             self._draw_golem(surf, bounce, scale)
         elif base == "boss":
             self._draw_boss(surf, bounce, scale)
+        if self.data.get("blindado") and "boss" not in self.tipo:
+            self._draw_armor_overlay(surf, bounce, scale)
         if self.poison_stacks > 0:
             for i in range(min(3, self.poison_stacks)):
                 pygame.draw.circle(surf, (0, 255, 0), (int(self.x - 6 + i * 6), int(self.y - 32 * scale + bounce)), 2)
@@ -479,16 +515,21 @@ class Enemy:
             pygame.draw.rect(surf, (0, 220, 0), (self.x - 14, self.y - 50 * scale, max(0, health_width), 4))
 
     def _draw_goblin(self, surf, bounce, scale):
-        body_color = (60, 170, 60)
+        body_color = (62, 174, 72)
         x = int(self.x)
         y = int(self.y + bounce)
-        pygame.draw.ellipse(surf, (40, 40, 40), (x - int(7 * scale), y - int(18 * scale), int(14 * scale), int(16 * scale)))
-        pygame.draw.circle(surf, body_color, (x, y - int(14 * scale)), int(5 * scale))
-        pygame.draw.polygon(surf, body_color, [(x, y - int(14 * scale)), (x + int(8 * scale), y - int(7 * scale)), (x, y - int(4 * scale))])
-        pygame.draw.circle(surf, (25, 25, 25), (x - int(3 * scale), y - int(16 * scale)), int(2 * scale))
-        pygame.draw.circle(surf, (25, 25, 25), (x + int(3 * scale), y - int(16 * scale)), int(2 * scale))
-        pygame.draw.line(surf, (90, 60, 30), (x + int(10 * scale), y - int(2 * scale)), (x + int(16 * scale), y - int(22 * scale)), int(2 * scale))
-        pygame.draw.circle(surf, (100, 255, 255), (x + int(16 * scale), y - int(22 * scale)), int(3 * scale))
+        draw_gloss_ellipse(surf, (54, 58, 46), (x - int(8 * scale), y - int(20 * scale), int(16 * scale), int(19 * scale)), border=max(1, int(scale)))
+        pygame.draw.polygon(surf, (42, 125, 50), [(x - int(8 * scale), y - int(15 * scale)), (x - int(17 * scale), y - int(12 * scale)), (x - int(8 * scale), y - int(10 * scale))])
+        pygame.draw.polygon(surf, (42, 125, 50), [(x + int(8 * scale), y - int(15 * scale)), (x + int(17 * scale), y - int(12 * scale)), (x + int(8 * scale), y - int(10 * scale))])
+        draw_gloss_ellipse(surf, body_color, (x - int(7 * scale), y - int(22 * scale), int(14 * scale), int(13 * scale)), border=max(1, int(scale)))
+        pygame.draw.polygon(surf, (45, 145, 60), [(x, y - int(14 * scale)), (x + int(9 * scale), y - int(7 * scale)), (x, y - int(5 * scale))])
+        pygame.draw.circle(surf, (20, 20, 18), (x - int(3 * scale), y - int(17 * scale)), int(2 * scale))
+        pygame.draw.circle(surf, (20, 20, 18), (x + int(3 * scale), y - int(17 * scale)), int(2 * scale))
+        pygame.draw.circle(surf, (240, 255, 180), (x - int(3 * scale), y - int(17 * scale)), max(1, int(scale)))
+        pygame.draw.circle(surf, (240, 255, 180), (x + int(3 * scale), y - int(17 * scale)), max(1, int(scale)))
+        pygame.draw.line(surf, (95, 58, 28), (x + int(10 * scale), y - int(2 * scale)), (x + int(17 * scale), y - int(23 * scale)), max(2, int(2 * scale)))
+        pygame.draw.circle(surf, (110, 245, 255), (x + int(17 * scale), y - int(23 * scale)), int(4 * scale))
+        pygame.draw.circle(surf, (245, 255, 255), (x + int(16 * scale), y - int(24 * scale)), max(1, int(scale)))
 
     def _draw_orc(self, surf, bounce, scale):
         x = int(self.x)
@@ -544,15 +585,29 @@ class Enemy:
         y = int(self.y + bounce)
         w = int(24 * scale)
         h = int(28 * scale)
-        pygame.draw.rect(surf, (110, 110, 120), (x - w // 2, y - h, w, h), border_radius=int(5 * scale))
-        pygame.draw.line(surf, (60, 40, 20), (x - int(12 * scale), y - h), (x + int(12 * scale), y), int(3 * scale))
-        pygame.draw.line(surf, (60, 40, 20), (x + int(12 * scale), y - h), (x - int(12 * scale), y), int(3 * scale))
-        pygame.draw.circle(surf, (100, 100, 110), (x, y - int(32 * scale)), int(7 * scale))
+        draw_iso_block(surf, x, y, w, h, int(6 * scale), (145, 148, 154), (98, 100, 108))
+        pygame.draw.line(surf, (62, 62, 68), (x - int(10 * scale), y - h + int(5 * scale)), (x + int(9 * scale), y - int(4 * scale)), int(2 * scale))
+        pygame.draw.line(surf, (74, 54, 34), (x + int(9 * scale), y - h + int(2 * scale)), (x - int(8 * scale), y - int(8 * scale)), int(2 * scale))
+        pygame.draw.circle(surf, (126, 128, 136), (x, y - int(32 * scale)), int(8 * scale))
+        pygame.draw.circle(surf, (160, 165, 170), (x - int(2 * scale), y - int(35 * scale)), int(3 * scale))
+        pygame.draw.circle(surf, (70, 230, 255), (x - int(3 * scale), y - int(32 * scale)), max(1, int(2 * scale)))
+        pygame.draw.circle(surf, (70, 230, 255), (x + int(3 * scale), y - int(32 * scale)), max(1, int(2 * scale)))
         pygame.draw.line(surf, (200, 200, 180), (x - int(3 * scale), y - int(32 * scale)), (x - int(8 * scale), y - int(40 * scale)), int(2 * scale))
         pygame.draw.line(surf, (200, 200, 180), (x + int(3 * scale), y - int(32 * scale)), (x + int(8 * scale), y - int(40 * scale)), int(2 * scale))
         club_x, club_y = x - int(15 * scale), y - int(15 * scale)
         pygame.draw.line(surf, (90, 60, 40), (club_x, club_y), (club_x - int(6 * scale), club_y - int(15 * scale)), int(5 * scale))
         pygame.draw.circle(surf, (150, 150, 150), (club_x - int(6 * scale), club_y - int(15 * scale)), int(4 * scale))
+
+    def _draw_armor_overlay(self, surf, bounce, scale):
+        x = int(self.x)
+        y = int(self.y + bounce)
+        steel = (150, 158, 168)
+        dark = (62, 68, 78)
+        pygame.draw.arc(surf, shade(steel, 35), (x - int(13 * scale), y - int(31 * scale), int(26 * scale), int(18 * scale)), math.pi, math.pi * 2, max(2, int(2 * scale)))
+        pygame.draw.rect(surf, steel, (x - int(9 * scale), y - int(24 * scale), int(18 * scale), int(10 * scale)), border_radius=int(3 * scale))
+        pygame.draw.rect(surf, dark, (x - int(9 * scale), y - int(24 * scale), int(18 * scale), int(10 * scale)), max(1, int(scale)), border_radius=int(3 * scale))
+        pygame.draw.line(surf, shade(steel, 45), (x - int(7 * scale), y - int(22 * scale)), (x + int(6 * scale), y - int(22 * scale)), max(1, int(scale)))
+        pygame.draw.circle(surf, (220, 215, 170), (x, y - int(19 * scale)), max(1, int(2 * scale)))
 
     def _draw_boss(self, surf, bounce, scale):
         x = int(self.x)
@@ -713,37 +768,51 @@ class Tower:
         if key not in CACHE_TORRES:
             data = self.stats
             h = int(data["altura"] + self.level * 1.5)
-            w = data["ancho"] + 18
-            surf_img = pygame.Surface((w + 26, h + 24), pygame.SRCALPHA)
+            w = data["ancho"] + 20
+            surf_img = pygame.Surface((w + 34, h + 42), pygame.SRCALPHA)
             cx = surf_img.get_width() // 2
-            cy = surf_img.get_height() - 6
-            shadow = pygame.Rect(cx - w // 2, cy - h + 4, w, h)
-            pygame.draw.rect(surf_img, (30, 30, 30, 90), shadow, border_radius=6)
-            body = pygame.Rect(cx - w // 2, cy - h, w, h)
-            pygame.draw.rect(surf_img, data["color_side"], body, border_radius=6)
-            pygame.draw.rect(surf_img, tuple(min(255, c + 30) for c in data["color_side"]), (body.x, body.y, body.w, int(body.h * 0.4)), border_radius=6)
-            pygame.draw.rect(surf_img, (20, 20, 20), body, 2, border_radius=6)
-            top = pygame.Rect(cx - w // 2 + 4, cy - h - 16, w - 8, 12)
-            pygame.draw.rect(surf_img, data["color_top"], top, border_radius=5)
-            pygame.draw.rect(surf_img, (255, 255, 255), (top.x + 2, top.y + 2, top.w - 4, 3), border_radius=3)
+            cy = surf_img.get_height() - 8
+            pygame.draw.ellipse(surf_img, (0, 0, 0, 85), (cx - w // 2 - 6, cy - 10, w + 12, 14))
+            draw_iso_block(surf_img, cx, cy, w + 10, 12, 7, shade(data["color_side"], 22), shade(data["color_side"], -24))
+            draw_iso_block(surf_img, cx, cy - 8, w, h, 8, shade(data["color_top"], 10), data["color_side"])
+            for stripe in range(3):
+                sx = cx - w // 2 + 7 + stripe * max(7, w // 4)
+                pygame.draw.line(surf_img, shade(data["color_side"], -35), (sx, cy - h + 7), (sx, cy - 11), 1)
+                pygame.draw.line(surf_img, shade(data["color_side"], 38), (sx + 1, cy - h + 7), (sx + 1, cy - 11), 1)
+            top = pygame.Rect(cx - w // 2 + 3, cy - h - 19, w - 6, 14)
+            pygame.draw.ellipse(surf_img, shade(data["color_top"], -25), top.move(0, 4))
+            pygame.draw.ellipse(surf_img, data["color_top"], top)
+            pygame.draw.ellipse(surf_img, shade(data["color_top"], 60), (top.x + 5, top.y + 2, max(8, top.w // 2), 4))
+            pygame.draw.ellipse(surf_img, (20, 20, 20), top, 1)
             if self.tipo == "arquera":
-                pygame.draw.polygon(surf_img, (160, 90, 60), [(cx - 2, cy - h - 16), (cx + 10, cy - h - 28), (cx + 22, cy - h - 14)])
+                pygame.draw.polygon(surf_img, (124, 72, 42), [(cx - 14, cy - h - 16), (cx + 6, cy - h - 34), (cx + 24, cy - h - 16)])
+                pygame.draw.polygon(surf_img, (214, 186, 94), [(cx - 9, cy - h - 17), (cx + 6, cy - h - 29), (cx + 19, cy - h - 17)])
+                pygame.draw.line(surf_img, (70, 42, 24), (cx + 6, cy - h - 32), (cx + 6, cy - h - 17), 2)
             elif self.tipo == "canon":
-                pygame.draw.rect(surf_img, (30, 30, 30), (cx - 8, cy - h - 8, 16, 12), border_radius=4)
-                pygame.draw.circle(surf_img, (20, 20, 20), (cx, cy - h - 10), 6)
+                pygame.draw.rect(surf_img, (42, 42, 48), (cx - 6, cy - h - 18, 24, 10), border_radius=4)
+                pygame.draw.circle(surf_img, (16, 16, 18), (cx + 18, cy - h - 13), 6)
+                pygame.draw.line(surf_img, (130, 130, 140), (cx - 3, cy - h - 16), (cx + 15, cy - h - 16), 2)
             elif self.tipo == "hielo":
-                pygame.draw.polygon(surf_img, (220, 255, 255), [(cx, cy - h - 20), (cx - 9, cy - h - 8), (cx + 9, cy - h - 8)])
+                pygame.draw.polygon(surf_img, (220, 255, 255), [(cx, cy - h - 30), (cx - 12, cy - h - 10), (cx + 12, cy - h - 10)])
+                pygame.draw.polygon(surf_img, (105, 210, 255), [(cx, cy - h - 30), (cx + 12, cy - h - 10), (cx + 1, cy - h - 14)])
+                pygame.draw.line(surf_img, (255, 255, 255), (cx - 3, cy - h - 25), (cx - 9, cy - h - 12), 2)
             elif self.tipo == "veneno":
-                pygame.draw.rect(surf_img, (30, 80, 30), (cx - 5, cy - h - 12, 10, 12), border_radius=4)
-                pygame.draw.circle(surf_img, (50, 255, 100), (cx, cy - h - 16), 4)
+                pygame.draw.rect(surf_img, (22, 72, 30), (cx - 8, cy - h - 19, 16, 14), border_radius=5)
+                pygame.draw.circle(surf_img, (70, 255, 110), (cx, cy - h - 22), 6)
+                pygame.draw.circle(surf_img, (210, 255, 190), (cx - 2, cy - h - 24), 2)
+                pygame.draw.circle(surf_img, (95, 205, 70), (cx + 9, cy - h - 11), 3)
             elif self.tipo == "fuego":
-                pygame.draw.polygon(surf_img, (255, 170, 80), [(cx - 8, cy - h - 18), (cx + 8, cy - h - 18), (cx, cy - h - 38)])
-                pygame.draw.circle(surf_img, (255, 120, 0), (cx, cy - h - 26), 5)
+                pygame.draw.polygon(surf_img, (255, 90, 25), [(cx - 11, cy - h - 14), (cx + 10, cy - h - 14), (cx + 3, cy - h - 38), (cx - 3, cy - h - 26)])
+                pygame.draw.polygon(surf_img, (255, 220, 80), [(cx - 5, cy - h - 15), (cx + 5, cy - h - 15), (cx, cy - h - 30)])
+                pygame.draw.circle(surf_img, (255, 140, 0), (cx, cy - h - 20), 5)
             elif self.tipo == "magia":
-                pygame.draw.circle(surf_img, (220, 140, 255), (cx, cy - h - 18), 8)
-                pygame.draw.circle(surf_img, (255, 255, 255), (cx, cy - h - 18), 3)
+                pygame.draw.circle(surf_img, (120, 60, 170), (cx, cy - h - 18), 13)
+                pygame.draw.circle(surf_img, (220, 140, 255), (cx, cy - h - 20), 9)
+                pygame.draw.circle(surf_img, (255, 255, 255), (cx - 3, cy - h - 23), 3)
+                pygame.draw.arc(surf_img, (255, 210, 255), (cx - 15, cy - h - 34, 30, 30), 0.1, 2.9, 1)
             for i in range(self.level):
-                pygame.draw.circle(surf_img, (255, 255, 0), (cx - 8 + i * 6, cy - h + 8), 2)
+                pygame.draw.circle(surf_img, (255, 225, 70), (cx - 8 + i * 6, cy - h + 8), 2)
+                pygame.draw.circle(surf_img, (120, 82, 18), (cx - 8 + i * 6, cy - h + 8), 2, 1)
             CACHE_TORRES[key] = (surf_img, cx, cy)
         image, anc_x, anc_y = CACHE_TORRES[key]
         surf.blit(image, (int(self.x - anc_x), int(self.y - anc_y)))
@@ -894,10 +963,36 @@ class GameSession:
         for gx in range(GRID_W):
             for gy in range(GRID_H):
                 cell = (gx, gy)
+                rect = get_rect(gx, gy)
                 if cell in self.path_cells:
-                    pygame.draw.rect(self.background, self.path_color, get_rect(gx, gy))
-                elif (gx + gy) % 2 == 0:
-                    pygame.draw.rect(self.background, self.grid_color, get_rect(gx, gy))
+                    pygame.draw.rect(self.background, self.path_color, rect)
+                    edge_color = shade(self.path_color, -30)
+                    if (gx - 1, gy) not in self.path_cells:
+                        pygame.draw.line(self.background, edge_color, rect.topleft, rect.bottomleft, 2)
+                    if (gx + 1, gy) not in self.path_cells:
+                        pygame.draw.line(self.background, edge_color, rect.topright, rect.bottomright, 2)
+                    if (gx, gy - 1) not in self.path_cells:
+                        pygame.draw.line(self.background, shade(self.path_color, 18), rect.topleft, rect.topright, 2)
+                    if (gx, gy + 1) not in self.path_cells:
+                        pygame.draw.line(self.background, edge_color, rect.bottomleft, rect.bottomright, 2)
+                    for k in range(3):
+                        px = rect.x + ((gx * 17 + gy * 29 + k * 11) % GRID_SIZE)
+                        py = rect.y + ((gx * 31 + gy * 13 + k * 7) % GRID_SIZE)
+                        pebble = shade(self.path_color, -20 if k % 2 else 24)
+                        pygame.draw.circle(self.background, pebble, (px, py), 1)
+                else:
+                    base = self.grid_color if (gx + gy) % 2 == 0 else self.bg_color
+                    pygame.draw.rect(self.background, base, rect)
+                    tint = shade(base, 16 if (gx * 3 + gy * 5) % 4 == 0 else -10)
+                    if self.es_desierto:
+                        pygame.draw.line(self.background, tint, (rect.x + 4, rect.y + 8), (rect.x + 26, rect.y + 4), 1)
+                        pygame.draw.line(self.background, shade(base, -18), (rect.x + 7, rect.y + 24), (rect.x + 28, rect.y + 28), 1)
+                    else:
+                        for k in range(2):
+                            bx = rect.x + ((gx * 19 + gy * 7 + k * 14) % GRID_SIZE)
+                            by = rect.y + ((gx * 11 + gy * 23 + k * 9) % GRID_SIZE)
+                            pygame.draw.line(self.background, tint, (bx, by), (bx + 3, by - 5), 1)
+                    pygame.draw.rect(self.background, shade(base, -18), rect, 1)
         for px, py in self.decorations:
             if self.es_desierto:
                 self._draw_cactus(self.background, px, py)
@@ -1129,17 +1224,31 @@ class GameSession:
                 SONIDOS.play("build")
 
     def _draw_tree(self, surf, x, y):
-        pygame.draw.rect(surf, COLORS["tree_trunk"], (x - 4, y - 10, 8, 20))
-        pygame.draw.circle(surf, COLORS["tree_leaves"], (x, y - 15), 12)
-        pygame.draw.circle(surf, (40, 110, 40), (x - 8, y - 8), 9)
-        pygame.draw.circle(surf, (40, 110, 40), (x + 8, y - 8), 9)
+        draw_shadow(surf, x, y + 2, 14)
+        pygame.draw.rect(surf, shade(COLORS["tree_trunk"], -22), (x - 5, y - 12, 10, 23), border_radius=2)
+        pygame.draw.rect(surf, COLORS["tree_trunk"], (x - 4, y - 13, 7, 22), border_radius=2)
+        pygame.draw.line(surf, shade(COLORS["tree_trunk"], 32), (x - 1, y - 11), (x - 1, y + 7), 1)
+        pygame.draw.circle(surf, shade(COLORS["tree_leaves"], -22), (x, y - 17), 14)
+        pygame.draw.circle(surf, COLORS["tree_leaves"], (x - 5, y - 20), 11)
+        pygame.draw.circle(surf, (41, 122, 45), (x - 11, y - 11), 10)
+        pygame.draw.circle(surf, (48, 136, 50), (x + 8, y - 11), 11)
+        pygame.draw.circle(surf, (74, 166, 68), (x - 4, y - 24), 4)
 
     def _draw_cactus(self, surf, x, y):
-        pygame.draw.rect(surf, COLORS["cactus"], (x - 5, y - 20, 10, 40), border_radius=5)
-        pygame.draw.rect(surf, COLORS["cactus"], (x - 12, y - 10, 8, 5), border_radius=2)
-        pygame.draw.rect(surf, COLORS["cactus"], (x - 12, y - 20, 5, 15), border_radius=2)
-        pygame.draw.rect(surf, COLORS["cactus"], (x + 5, y + 5, 8, 5), border_radius=2)
-        pygame.draw.rect(surf, COLORS["cactus"], (x + 8, y - 5, 5, 15), border_radius=2)
+        draw_shadow(surf, x, y + 18, 13)
+        dark = shade(COLORS["cactus"], -28)
+        light = shade(COLORS["cactus"], 36)
+        pygame.draw.rect(surf, dark, (x - 6, y - 21, 12, 42), border_radius=6)
+        pygame.draw.rect(surf, COLORS["cactus"], (x - 4, y - 22, 9, 41), border_radius=5)
+        pygame.draw.line(surf, light, (x - 1, y - 18), (x - 1, y + 16), 1)
+        pygame.draw.rect(surf, dark, (x - 13, y - 10, 9, 6), border_radius=3)
+        pygame.draw.rect(surf, COLORS["cactus"], (x - 13, y - 20, 6, 16), border_radius=3)
+        pygame.draw.line(surf, light, (x - 10, y - 17), (x - 10, y - 7), 1)
+        pygame.draw.rect(surf, dark, (x + 4, y + 5, 10, 6), border_radius=3)
+        pygame.draw.rect(surf, COLORS["cactus"], (x + 8, y - 6, 6, 17), border_radius=3)
+        pygame.draw.line(surf, light, (x + 11, y - 3), (x + 11, y + 8), 1)
+        for sy in range(y - 14, y + 16, 8):
+            pygame.draw.circle(surf, (235, 225, 190), (x + 5, sy), 1)
 
     def _draw_castle(self, surf, cx, cy):
         def block(x, y, w, h, c1, c2):
